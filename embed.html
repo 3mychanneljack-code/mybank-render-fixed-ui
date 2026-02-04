@@ -1,0 +1,18 @@
+
+<!DOCTYPE html>
+<html>
+<body>
+<h2>MyBank Dashboard</h2>
+<input id="u" placeholder="username">
+<input id="p" type="password" placeholder="password">
+<button onclick="login()">Login</button>
+<p>Balance: <span id="bal">0</span></p>
+<script>
+const BACKEND_URL = location.protocol==="file:"?"https://mybankonline.onrender.com":location.origin;
+async function login(){
+ const r=await fetch(BACKEND_URL+"/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u.value,password:p.value})});
+ const d=await r.json(); if(d.success) bal.innerText=d.balance; else alert(d.error);
+}
+</script>
+</body>
+</html>
