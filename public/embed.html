@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MyBank</title>
+<script src="bank.js"></script>
+<style>
+body{font-family:sans-serif;background:#111;color:#fff;text-align:center}
+.card{background:#222;padding:20px;margin:20px;border-radius:10px}
+</style>
+</head>
+<body>
+
+<h1>MyBank</h1>
+
+<div class="card">
+<input id="user" placeholder="username">
+<button onclick="login()">Login / Create</button>
+<h2 id="bal"></h2>
+</div>
+
+<script>
+let current;
+
+function users(){return JSON.parse(localStorage.mybank_users||"[]")}
+function save(u){localStorage.mybank_users=JSON.stringify(u)}
+
+function login(){
+  let u=users();
+  let name=user.value;
+  let acc=u.find(x=>x.name===name);
+  if(!acc){acc={name,balance:0};u.push(acc);save(u)}
+  current=acc;
+  bal.innerText="Balance: "+current.balance+" niftoes";
+}
+</script>
+
+</body>
+</html>
