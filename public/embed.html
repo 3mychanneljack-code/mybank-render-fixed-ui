@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>MyBank — Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:system-ui,Arial;padding:16px;max-width:800px;margin:auto}
+    input,button{padding:8px;margin:6px 0;display:block;width:100%}
+    .row{display:flex;gap:8px}
+    .row input{flex:1}
+    .card{padding:12px;border:1px solid #eee;border-radius:8px;margin:8px 0}
+    table{width:100%;border-collapse:collapse}
+    th,td{border:1px solid #ddd;padding:6px;text-align:left}
+  </style>
+</head>
+<body>
+  <h1>MyBank</h1>
+  <div id="auth">
+    <div class="card">
+      <h3>Login</h3>
+      <input id="loginUser" placeholder="Username">
+      <input id="loginPass" placeholder="Password" type="password">
+      <button onclick="login()">Login</button>
+    </div>
+
+    <div class="card">
+      <h3>Create Account</h3>
+      <input id="newUser" placeholder="Choose username">
+      <input id="newPass" placeholder="Choose password" type="password">
+      <button onclick="createUser()">Create Account</button>
+      <small>Starting balance: 0 Niftoes</small>
+    </div>
+  </div>
+
+  <div id="dash" style="display:none">
+    <div class="card">
+      <h3>Welcome, <span id="who"></span></h3>
+      <p>Balance: <strong><span id="bal">0</span></strong> Niftoes</p>
+      <div class="row">
+        <input id="sendTo" placeholder="Recipient username">
+        <input id="sendAmount" placeholder="Amount (max 20)" type="number" min="1" max="20">
+      </div>
+      <button onclick="send()">Send Niftoes</button>
+      <button onclick="refresh()">Refresh Balance</button>
+      <button onclick="logout()">Logout</button>
+    </div>
+
+    <div class="card">
+      <h3>Recent Transactions</h3>
+      <table id="txTable">
+        <thead><tr><th>When</th><th>From</th><th>To</th><th>Amount</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Notices</h3>
+      <div id="broadcasts"></div>
+    </div>
+  </div>
+
+<script>
+const BACKEND_URL = location.origin; // works when hosted with backend
+
+function showError(e){ alert(e); }
+
+async function createUser(){
+  const username = document.getElementById('newUser').value.trim();
+  const password = document.getElementById('newPass').value;
+  if(!username||!password){ showError('Enter username+password'); return; }
+  const res = await fetch(BACKEND_URL + '/api/createUser', {
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username,password})
+  });
+  const data = await res.json();
+  if(data.success){ alert('Account created — please login'); }
+  else showError(data.error||JSON.stringify(data));
+}
+
+async function login(){
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  if(!username||!password){ showError('Enter username+password'); return; }
+  const res = await fetch(BACKEND_URL + '/api/login', {
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username,password})
+  });
+  const data = await res.json();
+  if(data.success){ localStorage.mybankUser = username; showDashboard(data.user); }
+  else showError(data.error||JSON.stringify(data));
+}
+
+function showDashboard(user){
+  document.getElementById('auth').style.display='none';
+  document.getElementById('dash').style.display='block';
+  document.getElementById('who').innerText = user.username;
+  refresh();
+  loadTransactions();
+  loadBroadcasts();
+}
+
+async function refresh(){
+  const username = localStorage.mybankUser;
+  if(!username) return;
+  const res = await fetch(BACKEND_URL + '/api/balance', {
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username})
+  });
+  const data = await res.json();
+  if(data.balance!==undefined) document.getElementById('bal').innerText = data.balance;
+  else showError(data.error);
+}
+
+async function send(){
+  const from = localStorage.mybankUser;
+  const to = document.getElementById('sendTo').value.trim();
+  const amount = Number(document.getElementById('sendAmount').value);
+  if(!to||!amount){ showError('Recipient and amount required'); return; }
+  const res = await fetch(BACKEND_URL + '/api/send', {
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({from,to,amount})
+  });
+  const d = await res.json();
+  if(d.success){ alert('Sent!'); refresh(); loadTransactions(); }
+  else showError(d.error||JSON.stringify(d));
+}
+
+async function loadTransactions(){
+  // fetch recent transactions from server by calling admin transactions via public endpoint? Not available.
+  // We'll call /api/admin/transactions only if logged-in user is admin - skip for regular users.
+  const res = await fetch(BACKEND_URL + '/api/admin/transactions', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ adminUsername:'mywebhosting', adminPassword:'password123' })});
+  const d = await res.json();
+  const tbody = document.querySelector('#txTable tbody');
+  tbody.innerHTML = '';
+  if(Array.isArray(d)){
+    d.slice(0,20).forEach(t=>{
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${new Date(t.created_at).toLocaleString()}</td><td>${t.sender||'—'}</td><td>${t.receiver||'—'}</td><td>${t.amount}</td>`;
+      tbody.appendChild(row);
+    });
+  }
+}
+
+async function loadBroadcasts(){
+  const res = await fetch(BACKEND_URL + '/api/broadcasts');
+  const d = await res.json();
+  const el = document.getElementById('broadcasts');
+  el.innerHTML = d.map(b=>`<div><small>${new Date(b.created_at).toLocaleString()} — ${escapeHtml(b.message)}</small></div>`).join('');
+}
+
+function logout(){ localStorage.removeItem('mybankUser'); location.reload(); }
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+if(localStorage.mybankUser){
+  // try to show dashboard by fetching user info
+  (async ()=>{
+    const res = await fetch(BACKEND_URL + '/api/balance', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ username: localStorage.mybankUser })});
+    const d = await res.json();
+    if(d.balance!==undefined){
+      showDashboard({ username: localStorage.mybankUser });
+    } else {
+      localStorage.removeItem('mybankUser');
+    }
+  })();
+}
+</script>
+</body>
+</html>
